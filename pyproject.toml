@@ -1,0 +1,10 @@
+[project]
+name = "cron-brevo-added-to-doc"
+version = "0.1.0"
+description = "Trigger a mail send in Brevo when user is added to a Document"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "psycopg[binary]>=3.2.9",
+    "requests>=2.32.4",
+]
