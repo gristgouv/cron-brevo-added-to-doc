@@ -1,19 +1,15 @@
 import os
+import sys
 import time
+import json
 
 import psycopg
+from psycopg.rows import dict_row
 import requests
 
 APP_HOME_URL = os.environ.get("APP_HOME_URL")
 MAX_REQUEST_PER_SECOND = 10
 ONE_SECOND = 1
-
-USER_EMAIL = 0
-USER_ROLE = 1
-DOC_NAME = 2
-DOC_ID = 3
-ORG_DOMAIN = 4
-ADD_DATE = 5
 
 brevo_url = "https://api.brevo.com/v3/events"
 
@@ -24,7 +20,7 @@ brevo_headers = {
 }
 
 with psycopg.connect(conninfo = os.environ["PG_URL"]) as conn:
-    with conn.cursor() as cur:
+    with conn.cursor(row_factory=dict_row) as cur:
         cur.execute("""
             SELECT
                 l.display_email AS user_email,
@@ -66,18 +62,19 @@ def create_payload(user_in_doc):
     payload = {}
     payload["event_name"] = "added_to_document"
     payload["identifiers"] = {
-        "email_id": user_in_doc[USER_EMAIL]
+        "email_id": user_in_doc["user_email"]
     }
     payload["event_properties"] = {
-        "user_role": user_in_doc[USER_ROLE],
-        "doc_url": get_doc_url(user_in_doc[ORG_DOMAIN], user_in_doc[DOC_ID]),
-        "doc_name": user_in_doc[DOC_NAME],
-        "add_date": user_in_doc[ADD_DATE],
+        "user_role": user_in_doc["user_role"],
+        "doc_url": get_doc_url(user_in_doc["org_domain"], user_in_doc["doc_id"]),
+        "doc_name": user_in_doc["doc_name"],
+        "add_date": user_in_doc["add_date"].strftime("%d/%m/%Y, %H:%M:%S"),
     }
     return payload
 
 request_idx = 0
 start_time = time.time()
+error_counter = 0
 
 for user_in_doc in new_users_in_docs:
     if elapsed_time_since(start_time) >= ONE_SECOND:
@@ -88,4 +85,8 @@ for user_in_doc in new_users_in_docs:
     brevo_payload = create_payload(user_in_doc)
     response = requests.post(brevo_url, json=brevo_payload, headers=brevo_headers)
     print(response.text)
+    if response.status_code not in [200, 202]:
+        error_counter += 1
     request_idx += 1
+
+sys.exit(error_counter)
