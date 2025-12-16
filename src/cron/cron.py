@@ -15,12 +15,13 @@ brevo_url = "https://api.brevo.com/v3/events"
 brevo_headers = {
     "accept": "application/json",
     "content-type": "application/json",
-    "api-key": os.environ["BREVO_API_KEY"]
+    "api-key": os.environ["BREVO_API_KEY"],
 }
 
-with psycopg.connect(conninfo = os.environ["PG_URL"]) as conn:
+with psycopg.connect(conninfo=os.environ["PG_URL"]) as conn:
     with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT
                 l.display_email AS user_email,
                 g.name AS user_role,
@@ -45,11 +46,14 @@ with psycopg.connect(conninfo = os.environ["PG_URL"]) as conn:
                 on o.id = w.org_id
             WHERE gu.created_at >= NOW() - '1 day'::INTERVAL
             AND gu.user_id != d.created_by;
-        """)
+        """
+        )
         new_users_in_docs = cur.fetchall()
+
 
 def elapsed_time_since(start_time):
     return time.time() - start_time
+
 
 def get_doc_url(raw_org_domain, doc_id):
     org_domain = raw_org_domain
@@ -57,12 +61,11 @@ def get_doc_url(raw_org_domain, doc_id):
         org_domain = "docs"
     return f"{APP_HOME_URL}/o/{org_domain}/{doc_id}"
 
+
 def create_payload(user_in_doc):
     payload = {}
     payload["event_name"] = "added_to_document"
-    payload["identifiers"] = {
-        "email_id": user_in_doc["user_email"]
-    }
+    payload["identifiers"] = {"email_id": user_in_doc["user_email"]}
     payload["event_properties"] = {
         "user_role": user_in_doc["user_role"],
         "doc_url": get_doc_url(user_in_doc["org_domain"], user_in_doc["doc_id"]),
@@ -71,6 +74,7 @@ def create_payload(user_in_doc):
     }
     return payload
 
+
 request_idx = 0
 start_time = time.time()
 error_counter = 0
@@ -78,7 +82,9 @@ error_counter = 0
 for user_in_doc in new_users_in_docs:
     if elapsed_time_since(start_time) >= ONE_SECOND:
         start_time = time.time()
-    elif (request_idx >= MAX_REQUEST_PER_SECOND) and (elapsed_time_since(start_time) < ONE_SECOND):
+    elif (request_idx >= MAX_REQUEST_PER_SECOND) and (
+        elapsed_time_since(start_time) < ONE_SECOND
+    ):
         time.sleep(elapsed_time_since(start_time))
         request_idx = 0
     brevo_payload = create_payload(user_in_doc)
