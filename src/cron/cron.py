@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import json
 
 import psycopg
 from psycopg.rows import dict_row
