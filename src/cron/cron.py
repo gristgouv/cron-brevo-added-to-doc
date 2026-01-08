@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 
@@ -9,6 +10,10 @@ import requests
 APP_HOME_URL = os.environ.get("APP_HOME_URL")
 MAX_REQUEST_PER_SECOND = 10
 ONE_SECOND = 1
+
+# https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address
+EMAIL_ADDRESS_REGEX = r"^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
+email_address_regex = re.compile(EMAIL_ADDRESS_REGEX)
 
 brevo_url = "https://api.brevo.com/v3/events"
 
@@ -80,6 +85,9 @@ start_time = time.time()
 error_counter = 0
 
 for user_in_doc in new_users_in_docs:
+    if not email_address_regex.match(user_in_doc["user_email"]):
+        print(f"Invalid email: {user_in_doc['user_email']}")
+        continue
     if elapsed_time_since(start_time) >= ONE_SECOND:
         start_time = time.time()
     elif (request_idx >= MAX_REQUEST_PER_SECOND) and (
