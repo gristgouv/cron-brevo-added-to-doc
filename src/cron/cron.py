@@ -8,6 +8,7 @@ from psycopg.rows import dict_row
 import requests
 
 APP_HOME_URL = os.environ.get("APP_HOME_URL")
+CRON_INTERVAL_MINUTES = int(os.environ.get("CRON_INTERVAL_MINUTES"))
 MAX_REQUEST_PER_SECOND = 10
 ONE_SECOND = 1
 
@@ -26,7 +27,7 @@ brevo_headers = {
 with psycopg.connect(conninfo=os.environ["PG_URL"]) as conn:
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
-            """
+            f"""
             SELECT
                 l.display_email AS user_email,
                 g.name AS user_role,
@@ -49,7 +50,7 @@ with psycopg.connect(conninfo=os.environ["PG_URL"]) as conn:
                 on w.id = d.workspace_id
             INNER JOIN orgs AS o
                 on o.id = w.org_id
-            WHERE gu.created_at >= NOW() - '1 day'::INTERVAL
+            WHERE gu.created_at >= NOW() - '{CRON_INTERVAL_MINUTES} minute'::INTERVAL
             AND gu.user_id != d.created_by;
         """
         )
