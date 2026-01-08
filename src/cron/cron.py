@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 
@@ -7,8 +8,13 @@ from psycopg.rows import dict_row
 import requests
 
 APP_HOME_URL = os.environ.get("APP_HOME_URL")
+CRON_INTERVAL_MINUTES = int(os.environ.get("CRON_INTERVAL_MINUTES"))
 MAX_REQUEST_PER_SECOND = 10
 ONE_SECOND = 1
+
+# https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address
+EMAIL_ADDRESS_REGEX = r"^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
+email_address_regex = re.compile(EMAIL_ADDRESS_REGEX)
 
 brevo_url = "https://api.brevo.com/v3/events"
 
@@ -21,7 +27,7 @@ brevo_headers = {
 with psycopg.connect(conninfo=os.environ["PG_URL"]) as conn:
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
-            """
+            f"""
             SELECT
                 l.display_email AS user_email,
                 g.name AS user_role,
@@ -44,7 +50,7 @@ with psycopg.connect(conninfo=os.environ["PG_URL"]) as conn:
                 on w.id = d.workspace_id
             INNER JOIN orgs AS o
                 on o.id = w.org_id
-            WHERE gu.created_at >= NOW() - '1 day'::INTERVAL
+            WHERE gu.created_at >= NOW() - '{CRON_INTERVAL_MINUTES} minute'::INTERVAL
             AND gu.user_id != d.created_by;
         """
         )
@@ -80,6 +86,9 @@ start_time = time.time()
 error_counter = 0
 
 for user_in_doc in new_users_in_docs:
+    if not email_address_regex.match(user_in_doc["user_email"]):
+        print(f"Invalid email: {user_in_doc['user_email']}")
+        continue
     if elapsed_time_since(start_time) >= ONE_SECOND:
         start_time = time.time()
     elif (request_idx >= MAX_REQUEST_PER_SECOND) and (
